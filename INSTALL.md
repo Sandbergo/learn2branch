@@ -3,6 +3,8 @@
 Set-up a desired installation path for SCIP / SoPlex (e.g., `/opt/scip`):
 ```
 export SCIPOPTDIR='/opt/scip'
+mkdir /opt/scip
+cd /opt/scip
 ```
 
 ## SoPlex
@@ -69,6 +71,8 @@ SCIP's python interface (modified version)
 pip install git+https://github.com/ds4dm/PySCIPOpt.git@ml-branching
 ```
 
+might need to change scipoptdir in setup.py
+
 ## ExtraTrees
 ```
 conda install scikit-learn=0.20.2  # ExtraTrees
@@ -88,8 +92,15 @@ mkdir src/c
 tar -xzf svm_rank.tar.gz -C src/c
 pip install .
 ```
+NOTE: might have to add %s in line 1009 of src/c/svm_light/svm_commons.c
 
 ## Tensorflow
 ```
 conda install tensorflow-gpu=1.12.0
 ```
+
+
+## requirements:
+cython
+numpy=1.19.2
+scikit-learn=0.20.2

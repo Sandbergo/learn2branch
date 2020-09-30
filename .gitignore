@@ -1,6 +1,9 @@
-data
-trained_models
-results
+data/
+trained_models/
+results/
 
 .ipynb_checkpoints
 __pycache__/
+
+.vscode/
+env/

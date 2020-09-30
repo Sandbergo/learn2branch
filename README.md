@@ -37,7 +37,7 @@ python 05_evaluate.py setcover
 # Generate MILP instances
 python 01_generate_instances.py cauctions
 # Generate supervised learning datasets
-python 02_generate_samples.py cauctions -j 4  # number of available CPUs
+python 02_generate_dataset.py cauctions -j 4  # number of available CPUs
 # Training
 for i in {0..4}
 do
