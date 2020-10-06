@@ -28,7 +28,6 @@ def load_batch_tf(x):
 def pretrain(model, dataloader):
     """
     Pre-normalizes a model (i.e., PreNormLayer layers) over the given samples.
-
     Parameters
     ----------
     model : model.BaseModel
@@ -156,7 +155,8 @@ if __name__ == '__main__':
 
     running_dir = f"trained_models/{args.problem}/{args.model}/{args.seed}"
 
-    os.makedirs(running_dir)
+    if not os.path.exists(running_dir):
+        os.makedirs(running_dir)
 
     ### LOG ###
     logfile = os.path.join(running_dir, 'log.txt')
@@ -283,4 +283,3 @@ if __name__ == '__main__':
     model.restore_state(os.path.join(running_dir, 'best_params.pkl'))
     valid_loss, valid_kacc = process(model, valid_data, top_k, None)
     log(f"BEST VALID LOSS: {valid_loss:0.3f} " + "".join([f" acc@{k}: {acc:0.3f}" for k, acc in zip(top_k, valid_kacc)]), logfile)
-

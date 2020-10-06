@@ -68,5 +68,4 @@ def load_batch_gcnn(sample_files):
     cand_choices = tf.convert_to_tensor(cand_choices, dtype=tf.int32)
     cand_scoress = tf.convert_to_tensor(cand_scoress, dtype=tf.float32)
     n_cands_per_sample = tf.convert_to_tensor(n_cands_per_sample, dtype=tf.int32)
-
     return c_features, e_indices, e_features, v_features, n_cs_per_sample, n_vs_per_sample, n_cands_per_sample, candss, cand_choices, cand_scoress
