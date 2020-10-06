@@ -52,15 +52,11 @@ For reference, original installation instructions [here](http://scip.zib.de/doc/
 
 # Python dependencies
 
-Recommended setup: conda + python 3
-
-https://docs.conda.io/en/latest/miniconda.html
-
 ## Cython
 
 Required to compile PySCIPOpt and PySVMRank
 ```
-conda install cython
+pip install cython
 ```
 
 ## PySCIPOpt
@@ -73,11 +69,12 @@ pip install git+https://github.com/ds4dm/PySCIPOpt.git@ml-branching
 
 might need to change scipoptdir in setup.py, in that case run
 ```
-pip3 install . 
+pip install . 
 ```
 ## ExtraTrees
 ```
-conda install scikit-learn=0.20.2  # ExtraTrees
+pip install numpy==1.19.2
+pip install scikit-learn==0.20.2  # ExtraTrees
 ```
 
 ## LambdaMART
@@ -98,10 +95,5 @@ NOTE: might have to add %s in line 1009 of src/c/svm_light/svm_commons.c
 
 ## Tensorflow
 ```
-pip install tensorflow-gpu=1.12.0
+pip install tensorflow=1.13.1
 ```
-
-## requirements:
-cython
-numpy=1.19.2
-scikit-learn=0.20.2
