@@ -133,11 +133,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ### HYPER PARAMETERS ###
-    max_epochs = 1000
+    max_epochs = 10  # 1_000
     epoch_size = 312
-    batch_size = 32
-    pretrain_batch_size = 128
-    valid_batch_size = 128
+    batch_size = 2  # 32
+    pretrain_batch_size = 2  # 128
+    valid_batch_size = 2  # 128
     lr = 0.001
     patience = 10
     early_stopping = 20

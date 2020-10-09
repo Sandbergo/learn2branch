@@ -12,7 +12,7 @@ import gzip
 import tensorflow as tf
 import tensorflow.contrib.eager as tfe
 
-import svmrank
+# import svmrank
 
 import utilities
 
@@ -133,10 +133,10 @@ if __name__ == '__main__':
 
     os.makedirs("results", exist_ok=True)
     result_file = f"results/{args.problem}_validation_{time.strftime('%Y%m%d-%H%M%S')}.csv"
-    seeds = [0, 1, 2, 3, 4]
+    seeds = [0]  # [0, 1, 2, 3, 4] TODO: change this
     gcnn_models = ['baseline']
-    other_models = ['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil']
-    test_batch_size = 128
+    other_models = []  # ['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil'] TODO: change this
+    test_batch_size = 4  # 128 TODO: Change this
     top_k = [1, 3, 5, 10]
 
     problem_folders = {
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     problem_folder = problem_folders[args.problem]
 
     if args.problem == 'setcover':
-        gcnn_models += ['mean_convolution', 'no_prenorm']
+        gcnn_models += []  # ['mean_convolution', 'no_prenorm'] TODO: Change this
 
     result_file = f"results/{args.problem}_test_{time.strftime('%Y%m%d-%H%M%S')}"
 

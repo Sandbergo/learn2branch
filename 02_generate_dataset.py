@@ -315,9 +315,9 @@ if __name__ == '__main__':
 
     print(f"seed {args.seed}")
 
-    train_size = 100000
-    valid_size = 20000
-    test_size = 20000
+    train_size = 1000  # 100_000
+    valid_size = 1000  # 20_000
+    test_size = 1000  # 20_000
     exploration_strategy = 'pscost'
     node_record_prob = 0.05
     time_limit = 3600
@@ -355,7 +355,8 @@ if __name__ == '__main__':
     print(f"{len(instances_test)} test instances for {test_size} samples")
 
     # create output directory, throws an error if it already exists
-    os.makedirs(out_dir)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
     rng = np.random.RandomState(args.seed)
     collect_samples(instances_train, out_dir + '/train', rng, train_size,
