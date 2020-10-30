@@ -1,9 +1,12 @@
-import datetime
 import numpy as np
+import torch
+import torch.nn.functional as F
+import datetime
 import scipy.sparse as sp
 import pyscipopt as scip
 import pickle
 import gzip
+
 
 def log(str, logfile=None):
     str = f'[{datetime.datetime.now()}] {str}'
@@ -53,7 +56,6 @@ def extract_state(model, buffer=None):
     left- and right-hand side nodes, and an edge links two nodes iff the
     variable is involved in the constraint. Both the nodes and edges carry
     features.
-
     Parameters
     ----------
     model : pyscipopt.scip.Model
@@ -76,7 +78,6 @@ def extract_state(model, buffer=None):
 
     # update state from buffer if any
     s = model.getState(buffer['scip_state'] if 'scip_state' in buffer else None)
-    buffer['scip_state'] = s
 
     if 'state' in buffer:
         obj_norm = buffer['state']['obj_norm']
@@ -228,14 +229,12 @@ def valid_seed(seed):
 def compute_extended_variable_features(state, candidates):
     """
     Utility to extract variable features only from a bipartite state representation.
-
     Parameters
     ----------
     state : dict
         A bipartite state representation.
     candidates: list of ints
         List of candidate variables for which to compute features (given as indexes).
-
     Returns
     -------
     variable_states : np.array
@@ -286,7 +285,6 @@ def compute_extended_variable_features(state, candidates):
 def extract_khalil_variable_features(model, candidates, root_buffer):
     """
     Extract features following Khalil et al. (2016) Learning to Branch in Mixed Integer Programming.
-
     Parameters
     ----------
     model : pyscipopt.scip.Model
@@ -295,7 +293,6 @@ def extract_khalil_variable_features(model, candidates, root_buffer):
         A list of variables for which to compute the variable features.
     root_buffer : dict
         A buffer to avoid re-extracting redundant root node information (None to deactivate buffering).
-
     Returns
     -------
     variable_features : 2D np.ndarray
@@ -313,7 +310,6 @@ def extract_khalil_variable_features(model, candidates, root_buffer):
 def preprocess_variable_features(features, interaction_augmentation, normalization):
     """
     Features preprocessing following Khalil et al. (2016) Learning to Branch in Mixed Integer Programming.
-
     Parameters
     ----------
     features : 2D np.ndarray
@@ -322,7 +318,6 @@ def preprocess_variable_features(features, interaction_augmentation, normalizati
         Whether to augment features with 2-degree interactions (useful for linear models such as SVMs).
     normalization : bool
         Wether to normalize features in [0, 1] (i.e., query-based normalization).
-
     Returns
     -------
     variable_features : 2D np.ndarray
@@ -385,3 +380,197 @@ def load_flat_samples(filename, feat_type, label_type, augment_feats, normalize_
         raise ValueError(f"Invalid label type: '{label_type}'")
 
     return cand_states, cand_labels, best_cand_idx
+
+def load_flat_samples_modified(filename, feat_type, label_type, augment_feats, normalize_feats):
+    """
+    Modifies the `load_flat_samples` to adapt to the new structure in samples.
+    """
+    with gzip.open(filename, 'rb') as file:
+        sample = pickle.load(file)
+
+    # root data
+    if sample['type'] == "root":
+        state, khalil_state, cands, best_cand, cand_scores = sample['root_state'] # best_cand is relative to cands (in practical_l2b/02_generate_dataset.py)
+        best_cand_idx = best_cand
+    else:
+        # data for gcnn
+        obss, best_cand, obss_feats, _ = sample['obss']
+        v, gcnn_c_feats, gcnn_e = obss
+        gcnn_v_feats = v[:, :19] # gcnn features
+
+        state = {'values':gcnn_c_feats}, gcnn_e, {'values':gcnn_v_feats}
+        sample_cand_scores = obss_feats['scores']
+        cands = np.where(sample_cand_scores != -1)[0]
+        cand_scores = sample_cand_scores[cands]
+        khalil_state = v[:,19:-1][cands]
+
+        best_cand_idx = np.where(cands == best_cand)[0][0]
+
+
+    cands = np.array(cands)
+    cand_scores = np.array(cand_scores)
+
+    cand_states = []
+    if feat_type in ('all', 'gcnn_agg'):
+        cand_states.append(compute_extended_variable_features(state, cands))
+    if feat_type in ('all', 'khalil'):
+        cand_states.append(khalil_state)
+    cand_states = np.concatenate(cand_states, axis=1)
+    # best_cand_idx = np.where(cands == best_cand)[0][0]
+
+    # feature preprocessing
+    cand_states = preprocess_variable_features(cand_states, interaction_augmentation=augment_feats, normalization=normalize_feats)
+
+    if label_type == 'scores':
+        cand_labels = cand_scores
+
+    elif label_type == 'ranks':
+        cand_labels = np.empty(len(cand_scores), dtype=int)
+        cand_labels[cand_scores.argsort()] = np.arange(len(cand_scores))
+
+    elif label_type == 'bipartite_ranks':
+        # scores quantile discretization as in
+        # Khalil et al. (2016) Learning to Branch in Mixed Integer Programming
+        cand_labels = np.empty(len(cand_scores), dtype=int)
+        cand_labels[cand_scores >= 0.8 * cand_scores.max()] = 1
+        cand_labels[cand_scores < 0.8 * cand_scores.max()] = 0
+
+    else:
+        raise ValueError(f"Invalid label type: '{label_type}'")
+
+    return cand_states, cand_labels, best_cand_idx
+
+def _preprocess(state, mode='min-max-1'):
+    """
+    Implements preprocessing of `state`.
+
+    Parameters
+    ----------
+    state : np.array
+        2D array of features. rows are variables and columns are features.
+
+    Return
+    ------
+    (np.array) : same shape as state but with transformed variables
+    """
+    if mode == "min-max-1":
+        return preprocess_variable_features(state, interaction_augmentation=False, normalization=True)
+    elif mode == "min-max-2":
+        state -= state.min(axis=0, keepdims=True)
+        max_val = state.max(axis=0, keepdims=True)
+        max_val[max_val == 0] = 1
+        state = 2 * state/max_val - 1
+        state[:,-1] = 1 # bias
+        return state
+
+
+def _loss_fn(logits, labels, weights):
+    """
+    Cross-entropy loss
+    """
+    loss = torch.nn.CrossEntropyLoss(reduction='none')(logits, labels)
+    return torch.sum(loss * weights)
+
+
+def _compute_root_loss(separation_type, model, var_feats, root_n_vs, root_cands, root_n_cands, batch_size, root_cands_separation=False):
+    """
+    Computes losses due to auxiliary task imposed on root GCNN.
+
+    Parameters
+    ----------
+    separation_type : str
+        Type of separation to compute at root node's variable features
+    model : model.BaseModel
+        A base model, which may contain some model.PreNormLayer layers.
+    var_feats : torch.tensor
+        (2D) variable features at the root node
+    root_n_vs : torch.tensor
+        (1D) number of variables per sample
+    root_cands : torch.tensor
+        (1D) candidates variables (strong branching) at the root node
+    root_n_cands : torch.tensor
+        (1D) number of root candidate variables per sample
+    batch_size : int
+        number of samples
+    root_cands_separation : bool
+        True if separation is to be computed only between candidate variables at the root node. Useful for larger problems like Capacitated Facility Location.
+
+    Return
+    ------
+    (np.float): loss value
+    """
+
+    if root_cands_separation:
+        # compute separation loss only for candidates at root
+        n_vs = root_n_cands
+        var_feats =  model.pad_features(var_feats[root_cands], root_n_cands)
+    else:
+        n_vs = root_n_vs
+        var_feats = model.pad_features(var_feats, root_n_vs)
+
+    n_pairs = n_vs ** 2
+    A = torch.matmul(var_feats, var_feats.transpose(2,1)) # dot products
+    mask = torch.zeros_like(A)
+    for i,nv in enumerate(n_vs):
+        mask[i, nv:, :] = 1.0
+        mask[i, :, nv:] = 1.0
+        mask[i, torch.arange(nv), torch.arange(nv)] = 1.0
+    mask = mask.type(torch.bool)
+
+    if separation_type == "MHE":
+        D = torch.sqrt(2 * (1 - A) + 1e-3) ** -1 - 1/2
+    elif separation_type == "ED":
+        D = 4 - 2 * (1 - A)
+    else:
+        raise ValueError(f"Unknown signal for auxiliary task: {signal_type}")
+
+    D[mask] = 0.0
+    root_loss = 0.5 * D.sum(axis=[1,2])/n_pairs
+    root_loss = torch.mean(root_loss)
+
+    return root_loss
+
+
+def _distillation_loss(logits, teacher_scores, labels, weights, T, alpha):
+    """
+    Implements distillation loss.
+    """
+    p = F.log_softmax(logits/T, dim=-1)
+    q = F.softmax(teacher_scores/T, dim=-1)
+    l_kl = F.kl_div(p, q, reduction="none") * (T**2)
+    l_kl = torch.sum(torch.sum(l_kl, dim=-1) * weights)
+    l_ce = torch.nn.CrossEntropyLoss(reduction='none')(logits, labels)
+    l_ce = torch.sum(l_ce * weights)
+    return l_kl * alpha + l_ce * (1. - alpha)
+
+
+def _get_model_type(model_name):
+    """
+    Returns the name of the model to which `model_name` belongs
+
+    Parameters
+    ----------
+    model_name : str
+        name of the model
+
+    Return
+    ------
+    (str) : name of the folder to which this model belongs
+    """
+    if "concat" in model_name:
+        if "-pre" in model_name:
+            return "concat-pre"
+        return "concat"
+
+    if "hybridsvm-film" in model_name:
+        return "hybridsvm-film"
+
+    if "hybridsvm" in model_name:
+        return "hybridsvm"
+
+    if "film" in model_name:
+        if "-pre" in model_name:
+            return "film-pre"
+        return "film"
+
+    raise ValueError(f"Unknown model_name:{model_name}")

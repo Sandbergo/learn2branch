@@ -1,3 +1,4 @@
+
 import os
 import sys
 import importlib
@@ -9,10 +10,10 @@ import pickle
 
 import pyscipopt as scip
 
-import tensorflow as tf
-import tensorflow.contrib.eager as tfe
+# import tensorflow as tf
+# import tensorflow.contrib.eager as tfe
 
-# import svmrank
+import svmrank
 
 import utilities
 
@@ -137,21 +138,74 @@ if __name__ == '__main__':
         type=int,
         default=0,
     )
+    parser.add_argument(
+        '--internal_brancher',
+        help='any of the internal branching scheme used in SCIP.',
+        type=str,
+        default='',
+        choices=['relpscost', 'pscost', 'fullstrong', '', 'all']
+    )
+    parser.add_argument(
+        '--ml_comp_brancher',
+        help='any of the ml-competitor branching scheme',
+        type=str,
+        default='',
+        choices=['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil', '', 'all']
+    )
+    parser.add_argument(
+        '--no_gnn',
+        help='do not evaluate gnn models',
+        action="store_true"
+    )
+    parser.add_argument(
+        '--time_limit',
+        help='time limit to solve problems',
+        type=int,
+        default=3600,
+    )
+    parser.add_argument(
+        '--hybrid_data_structure',
+        help='dataset is generated for hybrid models',
+        action="store_true"
+    )
     args = parser.parse_args()
 
-    result_file = f"{args.problem}_{time.strftime('%Y%m%d-%H%M%S')}.csv"
     instances = []
-    seeds = [0]  # [0, 1, 2, 3, 4] TODO: Change this
-    gcnn_models = ['baseline']
-    other_models = []  # ['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil'] TODO: Change this
-    internal_branchers = ['relpscost']
-    time_limit = 3600
+    seeds = [0, 1, 2, 3, 4]
+    time_limit = args.time_limit
+    device = "CPU" if args.gpu == -1 else "GPU"
+
+    if args.hybrid_data_structure:
+        seeds = [0]
+        result_dir = f"eval_results/{args.problem}"
+        os.makedirs(result_dir, exist_ok=True)
+        result_file = f"{result_dir}/learn2branch_{device}_{time.strftime('%Y%m%d-%H%M%S')}.csv"
+    else:
+        os.makedirs('results', exist_ok=True)
+        result_file = f"results/{args.problem}_{time.strftime('%Y%m%d-%H%M%S')}.csv"
+
+    gcnn_models = ['baseline'] if not args.no_gnn else []
+    # ml comp
+    if args.ml_comp_brancher == "all":
+        other_models = ['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil']
+    elif args.ml_comp_brancher == "":
+        other_models = []
+    else:
+        other_models = [args.ml_comp_brancher]
+
+    # internal
+    if args.internal_brancher == "all":
+        internal_branchers = ['relpscost', 'pscost', 'fullstrong']
+    elif args.internal_brancher == "":
+        internal_branchers = []
+    else:
+        internal_branchers = [args.internal_brancher]
 
     if args.problem == 'setcover':
         instances += [{'type': 'small', 'path': f"data/instances/setcover/transfer_500r_1000c_0.05d/instance_{i+1}.lp"} for i in range(20)]
         instances += [{'type': 'medium', 'path': f"data/instances/setcover/transfer_1000r_1000c_0.05d/instance_{i+1}.lp"} for i in range(20)]
         instances += [{'type': 'big', 'path': f"data/instances/setcover/transfer_2000r_1000c_0.05d/instance_{i+1}.lp"} for i in range(20)]
-        gcnn_models += []  # ['mean_convolution', 'no_prenorm'] TODO: fix this
+        gcnn_models += ['mean_convolution', 'no_prenorm'] if not args.no_gnn else []
 
     elif args.problem == 'cauctions':
         instances += [{'type': 'small', 'path': f"data/instances/cauctions/transfer_100_500/instance_{i+1}.lp"} for i in range(20)]
@@ -164,7 +218,10 @@ if __name__ == '__main__':
         instances += [{'type': 'big', 'path': f"data/instances/facilities/transfer_400_100_5/instance_{i+1}.lp"} for i in range(20)]
 
     elif args.problem == 'indset':
-        instances += [{'type': 'small', 'path': f"data/instances/indset/transfer_500_4/instance_{i+1}.lp"} for i in range(20)]
+        if args.hybrid_data_structure:
+            instances += [{'type': 'small', 'path': f"data/instances/indset/transfer_750_4/instance_{i+1}.lp"} for i in range(20)]
+        else:
+            instances += [{'type': 'small', 'path': f"data/instances/indset/transfer_500_4/instance_{i+1}.lp"} for i in range(20)]
         instances += [{'type': 'medium', 'path': f"data/instances/indset/transfer_1000_4/instance_{i+1}.lp"} for i in range(20)]
         instances += [{'type': 'big', 'path': f"data/instances/indset/transfer_1500_4/instance_{i+1}.lp"} for i in range(20)]
 
@@ -260,9 +317,11 @@ if __name__ == '__main__':
         'ncutoffs',
         'walltime',
         'proctime',
+        'problem',
+        'device'
     ]
-    os.makedirs('results', exist_ok=True)
-    with open(f"results/{result_file}", 'w', newline='') as csvfile:
+
+    with open(result_file, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -316,10 +375,11 @@ if __name__ == '__main__':
                     'ncutoffs': ncutoffs,
                     'walltime': walltime,
                     'proctime': proctime,
+                    'problem': args.problem,
+                    'device': device
                 })
 
                 csvfile.flush()
                 m.freeProb()
 
                 print(f"  {policy['type']}:{policy['name']} {policy['seed']} - {nnodes} ({nnodes+2*(ndomchgs+ncutoffs)}) nodes {nlps} lps {stime:.2f} ({walltime:.2f} wall {proctime:.2f} proc) s. {status}")
-

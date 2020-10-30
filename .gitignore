@@ -1,9 +1,7 @@
+__pycache__/
+.vscode/
 data/
 trained_models/
-results/
-
-.ipynb_checkpoints
-__pycache__/
-
-.vscode/
-env/
+test_results/
+data/
+eval_results/

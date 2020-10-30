@@ -1,98 +1,121 @@
+"""
+File adapted from https://github.com/ds4dm/learn2branch
+"""
 import os
 import argparse
-import multiprocessing as mp
 import pickle
 import glob
-import numpy as np
 import shutil
 import gzip
+import math
+import numpy as np
+import multiprocessing as mp
 
 import pyscipopt as scip
 import utilities
 
-
-class SamplingAgent(scip.Branchrule):
-
-    def __init__(self, episode, instance, seed, out_queue, exploration_policy, query_expert_prob, out_dir, follow_expert=True):
-        self.episode = episode
-        self.instance = instance
-        self.seed = seed
-        self.out_queue = out_queue
-        self.exploration_policy = exploration_policy
+class VanillaFullstrongBranchingDataCollector(scip.Branchrule):
+    """
+    Implements branching policy to be used by SCIP such that data collection required for hybrid models is embedded in it.
+    """
+    def __init__(self, rng, query_expert_prob=0.60):
+        self.khalil_root_buffer = {}
+        self.obss = []
+        self.targets = []
+        self.obss_feats = []
+        self.exploration_policy = "pscost"
         self.query_expert_prob = query_expert_prob
-        self.out_dir = out_dir
-        self.follow_expert = follow_expert
-
-        self.rng = np.random.RandomState(seed)
-        self.new_node = True
-        self.sample_counter = 0
+        self.rng = rng
+        self.iteration_counter = 0
 
     def branchinit(self):
+        self.ndomchgs = 0
+        self.ncutoffs = 0
         self.khalil_root_buffer = {}
 
     def branchexeclp(self, allowaddcons):
+        self.iteration_counter += 1
 
-        if self.model.getNNodes() == 1:
-            # initialize root buffer for Khalil features extraction
-            utilities.extract_khalil_variable_features(self.model, [], self.khalil_root_buffer)
-
-        # once in a while, also run the expert policy and record the (state, action) pair
         query_expert = self.rng.rand() < self.query_expert_prob
-        if query_expert:
+        if query_expert or self.model.getNNodes() == 1:
+            candidate_vars, *_ = self.model.getPseudoBranchCands()
+            candidate_mask = [var.getCol().getLPPos() for var in candidate_vars]
+
             state = utilities.extract_state(self.model)
-            cands, *_ = self.model.getPseudoBranchCands()
-            state_khalil = utilities.extract_khalil_variable_features(self.model, cands, self.khalil_root_buffer)
+            state_khalil = utilities.extract_khalil_variable_features(self.model, candidate_vars, self.khalil_root_buffer)
 
             result = self.model.executeBranchRule('vanillafullstrong', allowaddcons)
             cands_, scores, npriocands, bestcand = self.model.getVanillafullstrongData()
+            best_var = cands_[bestcand]
 
-            assert result == scip.SCIP_RESULT.DIDNOTRUN
-            assert all([c1.getCol().getLPPos() == c2.getCol().getLPPos() for c1, c2 in zip(cands, cands_)])
+            self.add_obs(best_var, (state, state_khalil), (cands_, scores))
+            if self.model.getNNodes() == 1:
+                self.state = [state, state_khalil, self.obss[0]]
 
-            action_set = [c.getCol().getLPPos() for c in cands]
-            expert_action = action_set[bestcand]
-
-            data = [state, state_khalil, expert_action, action_set, scores]
-
-            # Do not record inconsistent scores. May happen if SCIP was early stopped (time limit).
-            if not any([s < 0 for s in scores]):
-
-                filename = f'{self.out_dir}/sample_{self.episode}_{self.sample_counter}.pkl'
-                with gzip.open(filename, 'wb') as f:
-                    pickle.dump({
-                        'episode': self.episode,
-                        'instance': self.instance,
-                        'seed': self.seed,
-                        'node_number': self.model.getCurrentNode().getNumber(),
-                        'node_depth': self.model.getCurrentNode().getDepth(),
-                        'data': data,
-                        }, f)
-
-                self.out_queue.put({
-                    'type': 'sample',
-                    'episode': self.episode,
-                    'instance': self.instance,
-                    'seed': self.seed,
-                    'node_number': self.model.getCurrentNode().getNumber(),
-                    'node_depth': self.model.getCurrentNode().getDepth(),
-                    'filename': filename,
-                })
-
-                self.sample_counter += 1
-
-        # if exploration and expert policies are the same, prevent running it twice
-        if not query_expert or (not self.follow_expert and self.exploration_policy != 'vanillafullstrong'):
+            self.model.branchVar(best_var)
+            result = scip.SCIP_RESULT.BRANCHED
+        else:
             result = self.model.executeBranchRule(self.exploration_policy, allowaddcons)
 
-        # apply 'vanillafullstrong' branching decision if needed
-        if query_expert and self.follow_expert or self.exploration_policy == 'vanillafullstrong':
-            assert result == scip.SCIP_RESULT.DIDNOTRUN
-            cands, scores, npriocands, bestcand = self.model.getVanillafullstrongData()
-            self.model.branchVar(cands[bestcand])
-            result = scip.SCIP_RESULT.BRANCHED
+        # fair node counting
+        if result == scip.SCIP_RESULT.REDUCEDDOM:
+            self.ndomchgs += 1
+        elif result == scip.SCIP_RESULT.CUTOFF:
+            self.ncutoffs += 1
 
-        return {"result": result}
+        return {'result':result}
 
+    def add_obs(self, best_var, state_, cands_scores=None):
+        """
+        Adds sample to the `self.obs` to be processed later at the end of optimization.
+
+        Parameters
+        ----------
+            best_var : pyscipopt.Variable
+                object representing variable in LP
+            state_ : tuple
+                extracted features of constraints and variables at a node
+            cands_scores : np.array
+                scores of each of the candidate variable on which expert policy was executed
+
+        Return
+        ------
+        (bool): True if sample is added succesfully. False o.w.
+        """
+        if self.model.getNNodes() == 1:
+            self.obss = []
+            self.targets = []
+            self.obss_feats = []
+            self.map = sorted([x.getCol().getIndex() for x in self.model.getVars(transformed=True)])
+
+        cands, scores = cands_scores
+        # Do not record inconsistent scores. May happen if SCIP was early stopped (time limit).
+        if any([s < 0 for s in scores]):
+            return False
+
+        state, state_khalil = state_
+        var_features = state[2]['values']
+        cons_features = state[0]['values']
+        edge_features = state[1]
+
+        # add more features to variables
+        cands_index = [x.getCol().getIndex() for x in cands]
+        khalil_features = -np.ones((var_features.shape[0], state_khalil.shape[1]))
+        cand_ind = np.zeros((var_features.shape[0],1))
+        khalil_features[cands_index] = state_khalil
+        cand_ind[cands_index] = 1
+        var_features = np.concatenate([var_features, khalil_features, cand_ind], axis=1)
+
+        tmp_scores = -np.ones(len(self.map))
+        if scores:
+            tmp_scores[cands_index] = scores
+
+        self.targets.append(best_var.getCol().getIndex())
+        self.obss.append([var_features, cons_features, edge_features])
+        depth = self.model.getCurrentNode().getDepth()
+        self.obss_feats.append({'depth':depth, 'scores':np.array(tmp_scores), 'iteration': self.iteration_counter})
+
+        return True
 
 def make_samples(in_queue, out_queue):
     """
@@ -105,10 +128,8 @@ def make_samples(in_queue, out_queue):
     out_queue : multiprocessing.Queue
         Output queue in which to send samples.
     """
-
     while True:
-        episode, instance, seed, exploration_policy, query_expert_prob, time_limit, out_dir = in_queue.get()
-        print(f'[w {os.getpid()}] episode {episode}, seed {seed}, processing instance \'{instance}\'...')
+        episode, instance, seed, time_limit, outdir, rng = in_queue.get()
 
         m = scip.Model()
         m.setIntParam('display/verblevel', 0)
@@ -116,16 +137,9 @@ def make_samples(in_queue, out_queue):
         utilities.init_scip_params(m, seed=seed)
         m.setIntParam('timing/clocktype', 2)
         m.setRealParam('limits/time', time_limit)
+        m.setLongintParam('limits/nodes', node_limit)
 
-        branchrule = SamplingAgent(
-            episode=episode,
-            instance=instance,
-            seed=seed,
-            out_queue=out_queue,
-            exploration_policy=exploration_policy,
-            query_expert_prob=query_expert_prob,
-            out_dir=out_dir)
-
+        branchrule = VanillaFullstrongBranchingDataCollector(rng, node_record_prob)
         m.includeBranchrule(
             branchrule=branchrule,
             name="Sampling branching rule", desc="",
@@ -138,85 +152,121 @@ def make_samples(in_queue, out_queue):
         m.setBoolParam('branching/vanillafullstrong/idempotent', True)
 
         out_queue.put({
-            'type': 'start',
-            'episode': episode,
-            'instance': instance,
-            'seed': seed,
+            "type":'start',
+            "episode":episode,
+            "instance":instance,
+            "seed": seed
         })
 
         m.optimize()
+        # data storage - root and node data are saved separately.
+        # node data carries a reference to the root filename.
+        if m.getNNodes() >= 1 and len(branchrule.obss) > 0 :
+            filenames = []
+            max_depth = max(x['depth'] for x in branchrule.obss_feats)
+            stats = {'nnodes':m.getNNodes(), 'time':m.getSolvingTime(), 'gap':m.getGap(), 'nobs':len(branchrule.obss)}
+
+            # prepare root data
+            sample_state, sample_khalil_state, root_obss = branchrule.state
+            sample_cand_scores = branchrule.obss_feats[0]['scores']
+            sample_cands = np.where(sample_cand_scores != -1)[0]
+            sample_cand_scores = sample_cand_scores[sample_cands]
+            cand_choice = np.where(sample_cands == branchrule.targets[0])[0][0]
+
+            root_filename = f"{outdir}/sample_root_0_{episode}.pkl"
+
+            filenames.append(root_filename)
+            with gzip.open(root_filename, 'wb') as f:
+                pickle.dump({
+                    'type':'root',
+                    'episode':episode,
+                    'instance': instance,
+                    'seed': seed,
+                    'stats': stats,
+                    'root_state': [sample_state, sample_khalil_state, sample_cands, cand_choice, sample_cand_scores],
+                    'obss': [branchrule.obss[0], branchrule.targets[0], branchrule.obss_feats[0], None],
+                    'max_depth': max_depth
+                    }, f)
+
+            # node data
+            for i in range(1, len(branchrule.obss)):
+                iteration_counter = branchrule.obss_feats[i]['iteration']
+                filenames.append(f"{outdir}/sample_node_{iteration_counter}_{episode}.pkl")
+                with gzip.open(filenames[-1], 'wb') as f:
+                    pickle.dump({
+                        'type' : 'node',
+                        'episode':episode,
+                        'instance': instance,
+                        'seed': seed,
+                        'stats': stats,
+                        'root_state': f"{outdir}/sample_root_0_{episode}.pkl",
+                        'obss': [branchrule.obss[i], branchrule.targets[i], branchrule.obss_feats[i], None],
+                        'max_depth': max_depth
+                    }, f)
+
+            out_queue.put({
+                "type": "done",
+                "episode": episode,
+                "instance": instance,
+                "seed": seed,
+                "filenames":filenames,
+                "nnodes":len(filenames),
+            })
+
         m.freeProb()
 
-        print(f"[w {os.getpid()}] episode {episode} done, {branchrule.sample_counter} samples")
-
-        out_queue.put({
-            'type': 'done',
-            'episode': episode,
-            'instance': instance,
-            'seed': seed,
-        })
-
-
-def send_orders(orders_queue, instances, seed, exploration_policy, query_expert_prob, time_limit, out_dir):
+def send_orders(orders_queue, instances, seed, time_limit, outdir, start_episode):
     """
-    Continuously send sampling orders to workers (relies on limited
-    queue capacity).
+    Worker loop: fetch an instance, run an episode and record samples.
 
     Parameters
     ----------
     orders_queue : multiprocessing.Queue
-        Queue to which to send orders.
+        Input queue from which orders are received.
     instances : list
-        Instance file names from which to sample episodes.
+        list of filepaths of instances which are solved by SCIP to collect data
     seed : int
-        Random seed for reproducibility.
-    exploration_policy : str
-        Branching strategy for exploration.
-    query_expert_prob : float in [0, 1]
-        Probability of running the expert strategy and collecting samples.
-    time_limit : float in [0, 1e+20]
-        Maximum running time for an episode, in seconds.
-    out_dir: str
-        Output directory in which to write samples.
+        initial seed to insitalize random number generator with
+    time_limit : int
+        maximum time for which to solve an instance while collecting data
+    outdir : str
+        directory where to save data
+    start_episode : int
+        episode to resume data collection. It is used if the data collection process was stopped earlier for some reason.
     """
     rng = np.random.RandomState(seed)
-
     episode = 0
     while True:
         instance = rng.choice(instances)
         seed = rng.randint(2**32)
-        orders_queue.put([episode, instance, seed, exploration_policy, query_expert_prob, time_limit, out_dir])
+        # already processed; for a broken process; for root dataset to not repeat instances and seed
+        if episode <= start_episode:
+            episode += 1
+            continue
+
+        orders_queue.put([episode, instance, seed, time_limit, outdir, rng])
         episode += 1
 
-
-def collect_samples(instances, out_dir, rng, n_samples, n_jobs,
-                    exploration_policy, query_expert_prob, time_limit):
+def collect_samples(instances, outdir, rng, n_samples, n_jobs, time_limit):
     """
-    Runs branch-and-bound episodes on the given set of instances, and collects
-    randomly (state, action) pairs from the 'vanilla-fullstrong' expert
-    brancher.
+    Worker loop: fetch an instance, run an episode and record samples.
 
     Parameters
     ----------
     instances : list
-        Instance files from which to collect samples.
-    out_dir : str
-        Directory in which to write samples.
-    rng : numpy.random.RandomState
-        A random number generator for reproducibility.
+        filepaths of instances which will be solved to collect data
+    outdir : str
+        directory where to save data
+    rng : np.random.RandomState
+        random number generator
     n_samples : int
-        Number of samples to collect.
+        total number of samples to collect.
     n_jobs : int
-        Number of jobs for parallel sampling.
-    exploration_policy : str
-        Exploration policy (branching rule) for sampling.
-    query_expert_prob : float in [0, 1]
-        Probability of using the expert policy and recording a (state, action)
-        pair.
-    time_limit : float in [0, 1e+20]
-        Maximum running time for an episode, in seconds.
+        number of CPUs to utilize or number of instances to solve in parallel.
+    time_limit : int
+        maximum time for which to solve an instance while collecting data
     """
-    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(outdir, exist_ok=True)
 
     # start workers
     orders_queue = mp.Queue(maxsize=2*n_jobs)
@@ -230,60 +280,48 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs,
         workers.append(p)
         p.start()
 
-    tmp_samples_dir = f'{out_dir}/tmp'
+    # dir to keep samples temporarily; helps keep a prefect count
+    tmp_samples_dir = f'{outdir}/tmp'
     os.makedirs(tmp_samples_dir, exist_ok=True)
+
+    # if the process breaks due to some reason, resume from this last_episode.
+    existing_samples = glob.glob(f"{outdir}/*.pkl")
+    last_episode, last_i = -1, 0
+    if existing_samples:
+        last_episode = max(int(x.split("/")[-1].split(".pkl")[0].split("_")[-2]) for x in existing_samples) # episode is 2nd last
+        last_i = max(int(x.split("/")[-1].split(".pkl")[0].split("_")[-1]) for x in existing_samples) # sample number is the last
 
     # start dispatcher
     dispatcher = mp.Process(
             target=send_orders,
-            args=(orders_queue, instances, rng.randint(2**32), exploration_policy, query_expert_prob, time_limit, tmp_samples_dir),
+            args=(orders_queue, instances, rng.randint(2**32), time_limit, tmp_samples_dir, last_episode),
             daemon=True)
     dispatcher.start()
 
-    # record answers and write samples
-    buffer = {}
-    current_episode = 0
-    i = 0
+    i = last_i # for a broken process
     in_buffer = 0
-    while i < n_samples:
+    while i <= n_samples:
         sample = answers_queue.get()
 
-        # add received sample to buffer
         if sample['type'] == 'start':
-            buffer[sample['episode']] = []
-        else:
-            buffer[sample['episode']].append(sample)
-            if sample['type'] == 'sample':
-                in_buffer += 1
+            in_buffer += 1
 
-        # if any, write samples from current episode
-        while current_episode in buffer and buffer[current_episode]:
-            samples_to_write = buffer[current_episode]
-            buffer[current_episode] = []
+        if sample['type'] == 'done':
+            for filename in sample['filenames']:
+                x = filename.split('/')[-1].split(".pkl")[0]
+                os.rename(filename, f"{outdir}/{x}.pkl")
+                i+=1
+                print(f"[m {os.getpid()}] {i} / {n_samples} samples written, ep {sample['episode']} ({in_buffer} in buffer).")
 
-            for sample in samples_to_write:
-
-                # if no more samples here, move to next episode
-                if sample['type'] == 'done':
-                    del buffer[current_episode]
-                    current_episode += 1
-
-                # else write sample
-                else:
-                    os.rename(sample['filename'], f'{out_dir}/sample_{i+1}.pkl')
-                    in_buffer -= 1
-                    i += 1
-                    print(f"[m {os.getpid()}] {i} / {n_samples} samples written, ep {sample['episode']} ({in_buffer} in buffer).")
-
+                if  i == n_samples:
                     # early stop dispatcher (hard)
-                    if in_buffer + i >= n_samples and dispatcher.is_alive():
+                    if dispatcher.is_alive():
                         dispatcher.terminate()
                         print(f"[m {os.getpid()}] dispatcher stopped...")
+                    break
 
-                    # as soon as enough samples are collected, stop
-                    if i == n_samples:
-                        buffer = {}
-                        break
+        if not dispatcher.is_alive():
+            break
 
     # stop all workers (hard)
     for p in workers:
@@ -291,9 +329,10 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs,
 
     shutil.rmtree(tmp_samples_dir, ignore_errors=True)
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
+    # problem parameters
     parser.add_argument(
         'problem',
         help='MILP instance type to process.',
@@ -305,6 +344,7 @@ if __name__ == '__main__':
         type=utilities.valid_seed,
         default=0,
     )
+
     parser.add_argument(
         '-j', '--njobs',
         help='Number of parallel jobs.',
@@ -313,38 +353,39 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    print(f"seed {args.seed}")
-
-    train_size = 1000  # 100_000
-    valid_size = 1000  # 20_000
-    test_size = 1000  # 20_000
-    exploration_strategy = 'pscost'
-    node_record_prob = 0.05
+    train_size = 150000
+    valid_size = 30000
+    test_size = 30000
     time_limit = 3600
+    node_limit = 500
 
+    node_record_prob = 1.0
+
+    basedir= "data/samples"
+    # get instance filenames
     if args.problem == 'setcover':
         instances_train = glob.glob('data/instances/setcover/train_500r_1000c_0.05d/*.lp')
         instances_valid = glob.glob('data/instances/setcover/valid_500r_1000c_0.05d/*.lp')
         instances_test = glob.glob('data/instances/setcover/test_500r_1000c_0.05d/*.lp')
-        out_dir = 'data/samples/setcover/500r_1000c_0.05d'
+        out_dir = f'{basedir}/setcover/500r_1000c_0.05d'
 
     elif args.problem == 'cauctions':
         instances_train = glob.glob('data/instances/cauctions/train_100_500/*.lp')
         instances_valid = glob.glob('data/instances/cauctions/valid_100_500/*.lp')
         instances_test = glob.glob('data/instances/cauctions/test_100_500/*.lp')
-        out_dir = 'data/samples/cauctions/100_500'
+        out_dir = f'{basedir}/cauctions/100_500'
 
     elif args.problem == 'indset':
-        instances_train = glob.glob('data/instances/indset/train_500_4/*.lp')
-        instances_valid = glob.glob('data/instances/indset/valid_500_4/*.lp')
-        instances_test = glob.glob('data/instances/indset/test_500_4/*.lp')
-        out_dir = 'data/samples/indset/500_4'
+        instances_train = glob.glob('data/instances/indset/train_750_4/*.lp')
+        instances_valid = glob.glob('data/instances/indset/valid_750_4/*.lp')
+        instances_test = glob.glob('data/instances/indset/test_750_4/*.lp')
+        out_dir = f'{basedir}/indset/750_4'
 
     elif args.problem == 'facilities':
         instances_train = glob.glob('data/instances/facilities/train_100_100_5/*.lp')
         instances_valid = glob.glob('data/instances/facilities/valid_100_100_5/*.lp')
         instances_test = glob.glob('data/instances/facilities/test_100_100_5/*.lp')
-        out_dir = 'data/samples/facilities/100_100_5'
+        out_dir = f'{basedir}/facilities/100_100_5'
         time_limit = 600
 
     else:
@@ -354,24 +395,25 @@ if __name__ == '__main__':
     print(f"{len(instances_valid)} validation instances for {valid_size} samples")
     print(f"{len(instances_test)} test instances for {test_size} samples")
 
-    # create output directory, throws an error if it already exists
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-
-    rng = np.random.RandomState(args.seed)
-    collect_samples(instances_train, out_dir + '/train', rng, train_size,
-                    args.njobs, exploration_policy=exploration_strategy,
-                    query_expert_prob=node_record_prob,
-                    time_limit=time_limit)
+    rng = np.random.RandomState(args.seed + 1)
+    collect_samples(instances_train, out_dir +"/train", rng, train_size, args.njobs, time_limit)
+    print("Success: Train data collection")
 
     rng = np.random.RandomState(args.seed + 1)
-    collect_samples(instances_valid, out_dir + '/valid', rng, test_size,
-                    args.njobs, exploration_policy=exploration_strategy,
-                    query_expert_prob=node_record_prob,
-                    time_limit=time_limit)
+    collect_samples(instances_valid, out_dir +"/valid", rng, valid_size, args.njobs, time_limit)
+    print("Success: Valid data collection")
 
-    rng = np.random.RandomState(args.seed + 2)
-    collect_samples(instances_test, out_dir + '/test', rng, test_size,
-                    args.njobs, exploration_policy=exploration_strategy,
-                    query_expert_prob=node_record_prob,
-                    time_limit=time_limit)
+    rng = np.random.RandomState(args.seed + 1)
+    collect_samples(instances_test, out_dir +"/test", rng, test_size, args.njobs, time_limit)
+    print("Success: Test data collection")
+
+    if args.problem == "indset":
+        mediumvalid_size = 2000
+        instances_mediumvalid = glob.glob('data/instances/indset/mediumvalid_1000_4/*.lp')
+        out_dir = f'{basedir}/indset/1000_4'
+
+        print(f"{len(instances_mediumvalid)} medium validation instances for {mediumvalid_size} samples")
+
+        rng = np.random.RandomState(args.seed + 1)
+        collect_samples(instances_mediumvalid, out_dir +"/mediumvalid", rng, mediumvalid_size, args.njobs, time_limit)
+        print("Success: Medium validation data collection")
