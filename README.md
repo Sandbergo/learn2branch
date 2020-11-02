@@ -1,14 +1,34 @@
-# Hybrid Models for Learning to Branch
+<h1 align="center">Learning to Branch</h1>
 
-Prateek Gupta, Maxime Gasse, Elias B. Khalil, M. Pawan Kumar, Andrea Lodi, Yoshua Bengio
+<div align="center">
 
-This is the official implementation of our NeurIPS 2020 [paper](https://arxiv.org/abs/2006.15212)
+  [![Status](https://img.shields.io/badge/status-active-success.svg)]() 
+  [![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENSE)
+
+</div>
+
+---
+
+<p align="center">
+Learning the optimal branching variable in Mixed Integer Linear Programming Brach & Bound algorithms with efficient multilayer perceptrons. 
+</p>
+<br> 
+
+
+## About <a name = "about"></a>
+
+This project is a continued exploration and development of ideas from two impressive pieces of academic work:
+
+Maxime Gasse, Didier Chételat, Nicola Ferroni, Laurent Charlin, Andrea Lodi [Exact Combinatorial Optimization with Graph Convolutional Neural Networks](https://github.com/ds4dm/learn2branch) (2019).
+
+Prateek Gupta, Maxime Gasse, Elias B. Khalil, M. Pawan Kumar, Andrea Lodi, Yoshua Bengio: [Hybrid Models for Learning to Branch](https://arxiv.org/abs/2006.15212) (2020)
+
+This is the code for my project thesis for a Master of Science in Engineering Cybernetics at the Norwegian University of Science and Technology. Feel free to contact me about any and all details of this project. 
 
 ## Installation
 
-This work is built upon [learn2branch](https://github.com/ds4dm/learn2branch), which proposes Graph Neural Network for learning to branch.
-We use it as a [git submodule](https://www.git-scm.com/book/en/v2/Git-Tools-Submodules).
-Follow installation instructions of [learn2branch](https://github.com/ds4dm/learn2branch/blob/master/INSTALL.md) to install [SCIP](https://www.scipopt.org/) and PySCIPOpt.
+
+Follow installation instructions of [learn2branch](https://github.com/Sandbergo/learn2branch/blob/master/INSTALL.md) to install [SCIP](https://www.scipopt.org/) and PySCIPOpt.
 
 Following python dependencies were used to run the code in this repository
 ```
@@ -21,13 +41,10 @@ PySCIPOpt==2.1.5
 scikit-learn==0.20.2
 ```
 
-OBS! Special pyscipopt @pgupta?
-
 To setup this repo, follow
 ```bash
-git clone https://github.com/pg2455/Hybrid-learn2branch.git
-cd Hybrid-learn2branch
-git submodule update --init
+git clone https://github.com/Sandbergo/learn2branch.git
+cd learn2branch
 ```
 
 ## How to run it?
@@ -131,7 +148,7 @@ python learn2branch/05_evaluate.py $PROBLEM --internal_brancher relpscost --time
 python learn2branch/05_evaluate.py $PROBLEM --internal_brancher fullstrong --time_limit 2700 --no_gnn  -g -1 --hybrid_data_structure # FSB
 ```
 
-Follow instructions [here](https://github.com/pg2455/Hybrid-learn2branch/blob/master/RESULTS.md) to reproduce the evaluation results (Table 4).
+Follow instructions [here](https://github.com/Sandbergo/learn2branch/blob/master/RESULTS.md) to reproduce the evaluation results (Table 4).
 
 ## Citation
 Please cite our paper if you use this code in your work.

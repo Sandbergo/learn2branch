@@ -64,7 +64,7 @@ pip install cython
 SCIP's python interface (modified version)
 
 ```
-pip install git+https://github.com/ds4dm/PySCIPOpt.git@ml-branching
+pip install git+https://github.com/ds4dm/PySCIPOpt.git@pgupta
 ```
 
 might need to change scipoptdir in setup.py, in that case run
@@ -91,9 +91,5 @@ mkdir src/c
 tar -xzf svm_rank.tar.gz -C src/c
 pip install .
 ```
-NOTE: might have to add %s in line 1009 of src/c/svm_light/svm_commons.c
+NOTE: might have to add %s in line 1009 of src/c/svm_light/svm_commons.c to work with modern compilers.
 
-## Tensorflow
-```
-pip install tensorflow=1.13.1
-```
