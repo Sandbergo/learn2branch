@@ -189,8 +189,9 @@ if __name__ == '__main__':
     valid_files = [str(x) for x in valid_files]
 
     valid_data = Dataset(valid_files, args.node_weights)
-    valid_data = torch.utils.data.DataLoader(valid_data, batch_size=valid_batch_size,
-                            shuffle = False, num_workers = num_workers, collate_fn = load_batch)
+    valid_data = torch.utils.data.DataLoader(
+        valid_data, batch_size=valid_batch_size,
+        shuffle=False, num_workers=num_workers, collate_fn=load_batch)
 
     ### MODEL LOADING ###
     sys.path.insert(0, os.path.abspath(f'models/mlp'))

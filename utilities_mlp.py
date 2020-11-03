@@ -46,7 +46,8 @@ class MLPDataset(torch.utils.data.Dataset):
         else:
             raise ValueError(f"Unknown value for node weights: {self.weighing_scheme}")
 
-        return  v_feats, sample_action, cand_scores, weight
+        return v_feats, sample_action, cand_scores, weight
+
 
 def load_batch(sample_batch):
     cand_featuress, sample_actions, cand_scoress, weights = list(zip(*sample_batch))
