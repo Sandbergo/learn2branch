@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import datetime
 import scipy.sparse as sp
-import pyscipopt as scip
+# import pyscipopt as scip
 import pickle
 import gzip
 
@@ -200,7 +200,7 @@ def extract_state(model, buffer=None):
     edge_features = {
         'names': edge_feat_names,
         'indices': edge_feat_indices,
-        'values': edge_feat_vals,}
+        'values': edge_feat_vals, }
 
     if 'state' not in buffer:
         buffer['state'] = {
@@ -381,6 +381,7 @@ def load_flat_samples(filename, feat_type, label_type, augment_feats, normalize_
 
     return cand_states, cand_labels, best_cand_idx
 
+
 def load_flat_samples_modified(filename, feat_type, label_type, augment_feats, normalize_feats):
     """
     Modifies the `load_flat_samples` to adapt to the new structure in samples.
@@ -405,7 +406,6 @@ def load_flat_samples_modified(filename, feat_type, label_type, augment_feats, n
         khalil_state = v[:,19:-1][cands]
 
         best_cand_idx = np.where(cands == best_cand)[0][0]
-
 
     cands = np.array(cands)
     cand_scores = np.array(cand_scores)
@@ -439,6 +439,7 @@ def load_flat_samples_modified(filename, feat_type, label_type, augment_feats, n
         raise ValueError(f"Invalid label type: '{label_type}'")
 
     return cand_states, cand_labels, best_cand_idx
+
 
 def _preprocess(state, mode='min-max-1'):
     """
@@ -503,7 +504,7 @@ def _compute_root_loss(separation_type, model, var_feats, root_n_vs, root_cands,
     if root_cands_separation:
         # compute separation loss only for candidates at root
         n_vs = root_n_cands
-        var_feats =  model.pad_features(var_feats[root_cands], root_n_cands)
+        var_feats = model.pad_features(var_feats[root_cands], root_n_cands)
     else:
         n_vs = root_n_vs
         var_feats = model.pad_features(var_feats, root_n_vs)

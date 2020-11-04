@@ -5,6 +5,7 @@ import torch
 
 import utilities
 
+
 class MLPDataset(torch.utils.data.Dataset):
     def __init__(self, sample_files, weighing_scheme="sigmoidal_decay"):
         self.sample_files = sample_files
