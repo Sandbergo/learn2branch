@@ -48,9 +48,11 @@ class PolicyBranching(scip.Branchrule):
 
         var_feats = np.concatenate([v, state_khalil, np.ones((v.shape[0],1))], axis=1)
         var_feats = utilities._preprocess(var_feats, mode="min-max-2")
-
+        # TODO: Move to(device) inside as_tensor()
         var_feats = torch.as_tensor(var_feats, dtype=torch.float32).to(device)
+        
         with torch.no_grad():
+            # TODO: drop .cpu().numpy() for faster running time?
             var_logits = self.policy(var_feats).cpu().numpy()
 
         best_var = candidate_vars[var_logits.argmax()]

@@ -45,10 +45,10 @@ if __name__ == '__main__':
     device = torch.device("cpu")
     rng = np.random.RandomState(101)
 
-    test_files = list(pathlib.Path(f"{args.data_path}/{args.problem}/{problem_folder}/test").glob('sample_node_2_0.pkl'))
-    #test_files = list(pathlib.Path(f"{args.data_path}/{args.problem}/{problem_folder}/test").glob('sample_*0.pkl'))
+    test_files = list(pathlib.Path(f"{args.data_path}/{args.problem}/{problem_folder}/test").glob('sample_node_135_57.pkl'))
+    # test_files = list(pathlib.Path(f"{args.data_path}/{args.problem}/{problem_folder}/test").glob('sample_*0.pkl'))
     test_files = [str(x) for x in test_files]
-    print(len(test_files))
+    # print(len(test_files))
 
     chosen_test_files = rng.choice(test_files, 1, replace=True)
 
@@ -59,12 +59,13 @@ if __name__ == '__main__':
         shuffle=False, num_workers=0, collate_fn=load_batch)
 
     for batch in test_data:
-        cand_features, n_cands, best_cands, cand_scores, weights = map(lambda x:x.to(device), batch)
+        (cand_features, n_cands, best_cands, cand_scores, weights) = batch
+        # cand_features, n_cands, best_cands, cand_scores, weights = map(lambda x:x.to(device), batch)
         print(cand_features.shape)
-        print(n_cands)
-        print(best_cands)
-        print(cand_scores[338])
-        print(weights)
+        # print(n_cands)
+        # print(best_cands)
+        # print(cand_scores[338])
+        # print(weights)
         # torch.set_printoptions(profile="full")
         # print(cand_features) # prints the whole tensor
         # exit(0)

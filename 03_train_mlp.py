@@ -163,7 +163,7 @@ if __name__ == '__main__':
     log(f"top_k: {top_k}", logfile)
     log(f"problem: {args.problem}", logfile)
     log(f"gpu: {args.gpu}", logfile)
-    log(f"seed {args.seed}", logfile)
+    log(f"seed: {args.seed}", logfile)
     log(f"node weights: {args.node_weights}", logfile)
 
     ### NUMPY / TORCH SETUP ###
