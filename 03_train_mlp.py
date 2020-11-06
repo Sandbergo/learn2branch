@@ -43,6 +43,9 @@ def process(model, dataloader, top_k, optimizer=None, ROOT_WT=0.0):
     n_samples_processed = 0
     for batch in dataloader:
         cand_features, n_cands, best_cands, cand_scores, weights = map(lambda x:x.to(device), batch)
+        print('Memory Usage:')
+        print(f'Allocated: {round(torch.cuda.memory_allocated(0)/1024**3,1)} GB')
+        print(f'Reserved:  {round(torch.cuda.memory_reserved(0)/1024**3,1)} GB')
         batched_states = (cand_features)
         batch_size = n_cands.shape[0]
         weights /= batch_size  # sum loss
@@ -131,7 +134,7 @@ if __name__ == '__main__':
     patience = 15
     early_stopping = 30
     top_k = [1, 3, 5, 10]
-    num_workers = 5
+    num_workers = 0  # TODO: originally 5
 
     if args.problem == "facilities":
         lr = 0.005  # for faster convergence
@@ -164,6 +167,7 @@ if __name__ == '__main__':
     log(f"problem: {args.problem}", logfile)
     log(f"gpu: {args.gpu}", logfile)
     log(f"seed: {args.seed}", logfile)
+    log(f"num_workers: {num_workers}", logfile)
     log(f"node weights: {args.node_weights}", logfile)
 
     ### NUMPY / TORCH SETUP ###
@@ -173,6 +177,10 @@ if __name__ == '__main__':
     else:
         os.environ['CUDA_VISIBLE_DEVICES'] = f'{args.gpu}'
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f'Using device: {torch.cuda.get_device_name(0)}')
+        print('Memory Usage:')
+        print(f'Allocated: {round(torch.cuda.memory_allocated(0)/1024**3,1)} GB')
+        print(f'Reserved:  {round(torch.cuda.memory_reserved(0)/1024**3,1)} GB')
 
     rng = np.random.RandomState(args.seed)
     torch.manual_seed(rng.randint(np.iinfo(int).max))
