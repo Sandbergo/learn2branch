@@ -86,6 +86,8 @@ def process(model, dataloader, top_k, optimizer=None, ROOT_WT=0.0):
 
 
 def _loss_fn(logits, labels, weights):
+    # TODO: Check if correct
+    # TODO: Test alternative
     loss = torch.nn.CrossEntropyLoss(reduction='none')(logits, labels)
     return torch.sum(loss * weights)
 

@@ -14,6 +14,7 @@ import multiprocessing as mp
 import pyscipopt as scip
 import utilities
 
+
 class VanillaFullstrongBranchingDataCollector(scip.Branchrule):
     """
     Implements branching policy to be used by SCIP such that data collection required for hybrid models is embedded in it.
@@ -63,7 +64,7 @@ class VanillaFullstrongBranchingDataCollector(scip.Branchrule):
         elif result == scip.SCIP_RESULT.CUTOFF:
             self.ncutoffs += 1
 
-        return {'result':result}
+        return {'result': result}
 
     def add_obs(self, best_var, state_, cands_scores=None):
         """
@@ -101,7 +102,7 @@ class VanillaFullstrongBranchingDataCollector(scip.Branchrule):
         # add more features to variables
         cands_index = [x.getCol().getIndex() for x in cands]
         khalil_features = -np.ones((var_features.shape[0], state_khalil.shape[1]))
-        cand_ind = np.zeros((var_features.shape[0],1))
+        cand_ind = np.zeros((var_features.shape[0], 1))
         khalil_features[cands_index] = state_khalil
         cand_ind[cands_index] = 1
         var_features = np.concatenate([var_features, khalil_features, cand_ind], axis=1)
@@ -113,9 +114,10 @@ class VanillaFullstrongBranchingDataCollector(scip.Branchrule):
         self.targets.append(best_var.getCol().getIndex())
         self.obss.append([var_features, cons_features, edge_features])
         depth = self.model.getCurrentNode().getDepth()
-        self.obss_feats.append({'depth':depth, 'scores':np.array(tmp_scores), 'iteration': self.iteration_counter})
+        self.obss_feats.append({'depth': depth, 'scores': np.array(tmp_scores), 'iteration': self.iteration_counter})
 
         return True
+
 
 def make_samples(in_queue, out_queue):
     """
@@ -152,9 +154,9 @@ def make_samples(in_queue, out_queue):
         m.setBoolParam('branching/vanillafullstrong/idempotent', True)
 
         out_queue.put({
-            "type":'start',
-            "episode":episode,
-            "instance":instance,
+            "type": 'start',
+            "episode": episode,
+            "instance": instance,
             "seed": seed
         })
 
@@ -164,7 +166,7 @@ def make_samples(in_queue, out_queue):
         if m.getNNodes() >= 1 and len(branchrule.obss) > 0 :
             filenames = []
             max_depth = max(x['depth'] for x in branchrule.obss_feats)
-            stats = {'nnodes':m.getNNodes(), 'time':m.getSolvingTime(), 'gap':m.getGap(), 'nobs':len(branchrule.obss)}
+            stats = {'nnodes': m.getNNodes(), 'time': m.getSolvingTime(), 'gap': m.getGap(), 'nobs': len(branchrule.obss)}
 
             # prepare root data
             sample_state, sample_khalil_state, root_obss = branchrule.state
@@ -178,8 +180,8 @@ def make_samples(in_queue, out_queue):
             filenames.append(root_filename)
             with gzip.open(root_filename, 'wb') as f:
                 pickle.dump({
-                    'type':'root',
-                    'episode':episode,
+                    'type': 'root',
+                    'episode': episode,
                     'instance': instance,
                     'seed': seed,
                     'stats': stats,
@@ -195,7 +197,7 @@ def make_samples(in_queue, out_queue):
                 with gzip.open(filenames[-1], 'wb') as f:
                     pickle.dump({
                         'type' : 'node',
-                        'episode':episode,
+                        'episode': episode,
                         'instance': instance,
                         'seed': seed,
                         'stats': stats,
@@ -209,11 +211,12 @@ def make_samples(in_queue, out_queue):
                 "episode": episode,
                 "instance": instance,
                 "seed": seed,
-                "filenames":filenames,
-                "nnodes":len(filenames),
+                "filenames": filenames,
+                "nnodes": len(filenames),
             })
 
         m.freeProb()
+
 
 def send_orders(orders_queue, instances, seed, time_limit, outdir, start_episode):
     """
@@ -246,6 +249,7 @@ def send_orders(orders_queue, instances, seed, time_limit, outdir, start_episode
 
         orders_queue.put([episode, instance, seed, time_limit, outdir, rng])
         episode += 1
+
 
 def collect_samples(instances, outdir, rng, n_samples, n_jobs, time_limit):
     """
@@ -310,10 +314,10 @@ def collect_samples(instances, outdir, rng, n_samples, n_jobs, time_limit):
             for filename in sample['filenames']:
                 x = filename.split('/')[-1].split(".pkl")[0]
                 os.rename(filename, f"{outdir}/{x}.pkl")
-                i+=1
+                i += 1
                 print(f"[m {os.getpid()}] {i} / {n_samples} samples written, ep {sample['episode']} ({in_buffer} in buffer).")
 
-                if  i == n_samples:
+                if i == n_samples:
                     # early stop dispatcher (hard)
                     if dispatcher.is_alive():
                         dispatcher.terminate()
@@ -328,6 +332,7 @@ def collect_samples(instances, outdir, rng, n_samples, n_jobs, time_limit):
         p.terminate()
 
     shutil.rmtree(tmp_samples_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -361,7 +366,7 @@ if __name__ == "__main__":
 
     node_record_prob = 1.0
 
-    basedir= "data/samples"
+    basedir = "data/samples"
     # get instance filenames
     if args.problem == 'setcover':
         instances_train = glob.glob('data/instances/setcover/train_500r_1000c_0.05d/*.lp')
@@ -415,5 +420,5 @@ if __name__ == "__main__":
         print(f"{len(instances_mediumvalid)} medium validation instances for {mediumvalid_size} samples")
 
         rng = np.random.RandomState(args.seed + 1)
-        collect_samples(instances_mediumvalid, out_dir +"/mediumvalid", rng, mediumvalid_size, args.njobs, time_limit)
+        collect_samples(instances_mediumvalid, out_dir + "/mediumvalid", rng, mediumvalid_size, args.njobs, time_limit)
         print("Success: Medium validation data collection")

@@ -13,7 +13,7 @@ import pyscipopt as scip
 # import tensorflow as tf
 # import tensorflow.contrib.eager as tfe
 
-import svmrank
+# import svmrank
 
 import utilities
 
@@ -266,10 +266,10 @@ if __name__ == '__main__':
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
     else:
         os.environ['CUDA_VISIBLE_DEVICES'] = f'{args.gpu}'
-    config = tf.ConfigProto()
+    """config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     tf.enable_eager_execution(config)
-    tf.executing_eagerly()
+    tf.executing_eagerly()"""
 
     # load and assign tensorflow models to policies (share models and update parameters)
     loaded_models = {}
@@ -329,7 +329,7 @@ if __name__ == '__main__':
             print(f"{instance['type']}: {instance['path']}...")
 
             for policy in branching_policies:
-                tf.set_random_seed(policy['seed'])
+                # tf.set_random_seed(policy['seed'])
 
                 m = scip.Model()
                 m.setIntParam('display/verblevel', 0)

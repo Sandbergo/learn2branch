@@ -4,6 +4,7 @@ Analyze features of the generated problems.
 import os
 import sys
 import importlib
+import gzip
 import argparse
 import csv
 import math
@@ -49,6 +50,22 @@ if __name__ == '__main__':
     # test_files = list(pathlib.Path(f"{args.data_path}/{args.problem}/{problem_folder}/test").glob('sample_*0.pkl'))
     test_files = [str(x) for x in test_files]
     # print(len(test_files))
+
+    with gzip.open(test_files[0], 'rb') as f:
+        sample = pickle.load(f)
+
+    obss, target, obss_feats, _ = sample['obss']
+    #print(obss)
+    
+    v, _, _ = obss
+    print(v.shape)
+    sample_cand_scores = obss_feats['scores']
+    sample_cands = np.where(sample_cand_scores != -1)[0]
+
+    v_feats = v[sample_cands]
+    # v_feats = utilities._preprocess(v_feats, mode='min-max-2')
+
+    exit(0)
 
     chosen_test_files = rng.choice(test_files, 1, replace=True)
 
