@@ -280,7 +280,7 @@ if __name__ == '__main__':
                     'ncutoffs': ncutoffs,
                     'walltime': walltime,
                     'proctime': proctime,
-                    'problem':args.problem,
+                    'problem': args.problem,
                     'device': device
                 })
 

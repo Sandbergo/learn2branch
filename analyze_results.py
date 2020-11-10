@@ -21,7 +21,15 @@ if __name__ == '__main__':
 
     types = ['small', 'medium', 'big']
     for result in results:
-        print(f"\npolicy: {result['policy'][0]} | problem: {result['problem'][0]}")
+        print(f"\npolicy: {result['policy'][0]} \t\t problem: {result['problem'][0]}")
         for type in types:
             times = result.loc[result['type'] == type]['walltime']
-            print(f'\t{type}: {round(times.mean(), 2)} +/- {round(times.std(), 2)} s')
+            nnodes = result.loc[result['type'] == type]['nnodes']
+            status = result.loc[result['type'] == type].groupby(result.status.str.strip("'"))['status'].count()
+            print(f'\t{type}: {round(times.mean(), 2)} +/- {round(times.std(), 2)} s', end='  ')
+            print(f'\tnodes: {round(nnodes.mean(), 2)} +/- {round(times.std(), 2)} #', end='  ')
+            try:
+                print(f'''\topt: {status['optimal']} /  {status['timelimit']}''')
+            except Exception:
+                pass
+            print()

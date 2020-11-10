@@ -66,7 +66,7 @@ class VanillaFullstrongBranchingDataCollector(scip.Branchrule):
 
         return {'result': result}
 
-    def add_obs(self, best_var, state_, cands_scores=None):
+    def add_obs(self, best_var, state_, cands_scores=None): # TODO: return to normalcy
         """
         Adds sample to the `self.obs` to be processed later at the end of optimization.
 
@@ -113,6 +113,7 @@ class VanillaFullstrongBranchingDataCollector(scip.Branchrule):
 
         self.targets.append(best_var.getCol().getIndex())
         self.obss.append([var_features, cons_features, edge_features])
+        print(self.obss.shape)
         depth = self.model.getCurrentNode().getDepth()
         self.obss_feats.append({'depth': depth, 'scores': np.array(tmp_scores), 'iteration': self.iteration_counter})
 
@@ -378,7 +379,7 @@ if __name__ == "__main__":
         instances_train = glob.glob('data/instances/cauctions/train_100_500/*.lp')
         instances_valid = glob.glob('data/instances/cauctions/valid_100_500/*.lp')
         instances_test = glob.glob('data/instances/cauctions/test_100_500/*.lp')
-        out_dir = f'{basedir}/cauctions/100_500'
+        out_dir = f'{basedir}/cauctions/test' # TODO: f'{basedir}/cauctions/100_500'
 
     elif args.problem == 'indset':
         instances_train = glob.glob('data/instances/indset/train_750_4/*.lp')
@@ -401,15 +402,15 @@ if __name__ == "__main__":
     print(f"{len(instances_test)} test instances for {test_size} samples")
 
     rng = np.random.RandomState(args.seed + 1)
-    collect_samples(instances_train, out_dir +"/train", rng, train_size, args.njobs, time_limit)
+    collect_samples(instances_train, out_dir + "/train", rng, train_size, args.njobs, time_limit)
     print("Success: Train data collection")
 
     rng = np.random.RandomState(args.seed + 1)
-    collect_samples(instances_valid, out_dir +"/valid", rng, valid_size, args.njobs, time_limit)
+    collect_samples(instances_valid, out_dir + "/valid", rng, valid_size, args.njobs, time_limit)
     print("Success: Valid data collection")
 
     rng = np.random.RandomState(args.seed + 1)
-    collect_samples(instances_test, out_dir +"/test", rng, test_size, args.njobs, time_limit)
+    collect_samples(instances_test, out_dir + "/test", rng, test_size, args.njobs, time_limit)
     print("Success: Test data collection")
 
     if args.problem == "indset":
