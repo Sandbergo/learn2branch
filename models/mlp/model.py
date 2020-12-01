@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+
 class Model(torch.nn.Module):
     def initialize_parameters(self):
         for l in self.modules():
@@ -45,6 +46,7 @@ class Model(torch.nn.Module):
     def restore_state(self, filepath):
         self.load_state_dict(torch.load(filepath, map_location=torch.device('cpu')))
 
+
 class Policy(Model):
     def __init__(self):
         super(Model, self).__init__()
@@ -53,8 +55,7 @@ class Policy(Model):
         self.ff_size = 256
 
         self.activation = torch.nn.ReLU()
-
-        # OUTPUT
+        # Original, seed 0
         self.output_module = nn.Sequential(
             nn.Linear(self.n_input_feats, self.ff_size, bias=True),
             self.activation,
@@ -62,9 +63,56 @@ class Policy(Model):
             self.activation,
             nn.Linear(self.ff_size, self.ff_size, bias=True),
             self.activation,
-            nn.Linear(self.ff_size, 1, bias=False)
+            nn.Linear(self.ff_size, 1, bias=False),
+        )
+        
+        # seed 46
+        self.output_module = nn.Sequential(
+            nn.Linear(self.n_input_feats, self.ff_size*4, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*4, self.ff_size*2, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*2, self.ff_size, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size, 1, bias=True),
         )
 
+        # seed 35
+        self.output_module = nn.Sequential(
+            nn.Linear(self.n_input_feats, 512, bias=True),
+            self.activation,
+            nn.Linear(512, 256, bias=True),
+            self.activation,
+            nn.Linear(256, 64, bias=True),
+            self.activation,
+            nn.Linear(64, 1, bias=True),
+        )
+
+
+        # Seed 61
+        self.output_module = nn.Sequential(
+            nn.Linear(self.n_input_feats, 1, bias=True),
+        )
+
+        
+        # seed ??
+        self.output_module = nn.Sequential(
+            nn.Linear(self.n_input_feats, self.ff_size*4, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*4, self.ff_size*4, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*4, self.ff_size*4, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*4, self.ff_size*4, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*4, self.ff_size*4, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*4, self.ff_size*4, bias=True),
+            self.activation,
+            nn.Linear(self.ff_size*4, 1, bias=True),
+        )
+        
+        print(self.output_module)
         self.initialize_parameters()
 
     @staticmethod
@@ -79,9 +127,9 @@ class Policy(Model):
 
         output = torch.cat([
             F.pad(x,
-                pad=[0, n_vars_max - x.shape[1], 0, 0],
-                mode='constant',
-                value=pad_value)
+                  pad=[0, n_vars_max - x.shape[1], 0, 0],
+                  mode='constant',
+                  value=pad_value)
             for x in output
         ], dim=0)
 
@@ -91,4 +139,6 @@ class Policy(Model):
         features = inputs
         output = self.output_module(features)
         output = torch.reshape(output, [1, -1])
+        # For benchmarking random, in log 35
+        # output = torch.rand(output.shape, requires_grad=True)
         return output

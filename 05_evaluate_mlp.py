@@ -115,7 +115,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     instances = []
-    seeds = [0, 1, 2]
+    seeds = [61]  # [0, 61, 70]  # [0, 1, 2]
     time_limit = 2700
 
     ### OUTPUT DIRECTORY

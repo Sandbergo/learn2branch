@@ -101,10 +101,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ### HYPER PARAMETERS ###
-    seeds = [0, 1, 2]
+    seeds = [70]  # [0, 61, 70]  #  [35]  # TODO: [0, 1, 2]
     test_batch_size = 128
-    top_k = [1, 3, 5, 10]
-    num_workers = 5
+    top_k = range(0, 11)  # TODO: [1, 3, 5, 10]
+    num_workers = 0  # TODO: 5
 
     problem_folders = {
         'setcover': '500r_1000c_0.05d',
@@ -149,7 +149,7 @@ if __name__ == '__main__':
     test_files = [str(x) for x in test_files]
     test_data = Dataset(test_files)
     test_data = torch.utils.data.DataLoader(test_data, batch_size=test_batch_size,
-                            shuffle = False, num_workers = num_workers, collate_fn = load_batch)
+        shuffle=False, num_workers=num_workers, collate_fn=load_batch)
 
     print(f"{len(test_files)} test samples")
 

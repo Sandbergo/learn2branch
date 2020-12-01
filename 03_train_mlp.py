@@ -41,11 +41,11 @@ def process(model, dataloader, top_k, optimizer=None, ROOT_WT=0.0):
     mean_kacc = np.zeros(len(top_k))
 
     n_samples_processed = 0
-    for batch in dataloader:
+    for i, batch in enumerate(dataloader):
         cand_features, n_cands, best_cands, cand_scores, weights = map(lambda x:x.to(device), batch)
-        print('Memory Usage:')
-        print(f'Allocated: {round(torch.cuda.memory_allocated(0)/1024**3,1)} GB')
-        print(f'Reserved:  {round(torch.cuda.memory_reserved(0)/1024**3,1)} GB')
+        # print('Memory Usage:')
+        # print(f'Allocated: {round(torch.cuda.memory_allocated(0)/1024**3,1)} GB')
+        # print(f'Reserved:  {round(torch.cuda.memory_reserved(0)/1024**3,1)} GB')
         batched_states = (cand_features)
         batch_size = n_cands.shape[0]
         weights /= batch_size  # sum loss
@@ -78,6 +78,9 @@ def process(model, dataloader, top_k, optimizer=None, ROOT_WT=0.0):
         mean_loss += loss.detach_().item() * batch_size
         mean_kacc += kacc * batch_size
         n_samples_processed += batch_size
+        #if i > 4:
+        #    break
+
 
     mean_loss /= n_samples_processed
     mean_kacc /= n_samples_processed
@@ -86,8 +89,11 @@ def process(model, dataloader, top_k, optimizer=None, ROOT_WT=0.0):
 
 
 def _loss_fn(logits, labels, weights):
-    # TODO: Check if correct
     # TODO: Test alternative
+    """np.set_printoptions(threshold=sys.maxsize)
+    print(logits.detach().numpy())
+    print('\n\n')
+    print(labels.detach().numpy())"""
     loss = torch.nn.CrossEntropyLoss(reduction='none')(logits, labels)
     return torch.sum(loss * weights)
 
@@ -126,13 +132,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ### HYPER PARAMETERS ###
-    max_epochs = 1000
-    epoch_size = 312
-    batch_size = 32
+    max_epochs = 100  # 1000 
+    epoch_size = 312  # 312 unknown effect
+    batch_size = 32  # 32 should probably increase
     accum_steps = 1  # step() is called after  batch_size * accum_steps samples
     pretrain_batch_size = 128
     valid_batch_size = 128
-    lr = 0.001
+    lr = 0.0005  # 0.001
     patience = 15
     early_stopping = 30
     top_k = [1, 3, 5, 10]
@@ -192,11 +198,16 @@ if __name__ == '__main__':
     train_files = list(pathlib.Path(f"{args.data_path}/{args.problem}/{problem_folder}/train").glob('sample_*.pkl'))
     valid_files = list(pathlib.Path(f"{args.data_path}/{args.problem}/{problem_folder}/valid").glob('sample_*.pkl'))
 
+    # TODO: This...
+    import random
+    valid_files = random.sample(valid_files, len(valid_files)//6)
+
     log(f"{len(train_files)} training samples", logfile)
     log(f"{len(valid_files)} validation samples", logfile)
 
     train_files = [str(x) for x in train_files]
     valid_files = [str(x) for x in valid_files]
+    
 
     valid_data = Dataset(valid_files, args.node_weights)
     valid_data = torch.utils.data.DataLoader(

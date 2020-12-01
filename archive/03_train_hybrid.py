@@ -180,6 +180,7 @@ def process(model, teacher, dataloader, top_k, optimizer=None):
 
     return mean_loss, mean_kacc
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
