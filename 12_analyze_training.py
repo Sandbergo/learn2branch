@@ -22,7 +22,7 @@ def plot_loss(str_log):
     plt.legend()
     plt.xlabel("Number of gradient steps")
     plt.ylabel("Loss")
-    plt.savefig("figures/loss.png")
+    plt.savefig("figures/loss0.eps")
 
 
 def plot_kacc(str_log):
@@ -79,11 +79,11 @@ def barplot_kacc_random(str_log):
 
 
 if __name__ == "__main__":
-    with open('trained_models/cauctions/mlp_sigmoidal_decay/12/log.txt') as log:
+    with open('trained_models/cauctions/mlp_sigmoidal_decay/0/log.txt') as log:
         str_log = log.read()
-        #plot_loss(str_log)
+        plot_loss(str_log)
         #plot_kacc(str_log)
         #
-        with open('trained_models/cauctions/mlp_sigmoidal_decay/15/log.txt') as rand:
+        """with open('trained_models/cauctions/mlp_sigmoidal_decay/15/log.txt') as rand:
             str_random = rand.read()
-            barplot_kacc_random(str_log, str_random)
+            barplot_kacc_random(str_log, str_random)"""

@@ -6,6 +6,7 @@ import os
 import pandas as pd
 
 
+
 def console_print():
     results = os.listdir('eval_results/cauctions/')
     results = [pd.read_csv(f'eval_results/cauctions/{file}') for file in results]
@@ -13,15 +14,15 @@ def console_print():
     types = ['small', 'medium', 'big']
 
     for result in results:
-        print(f"\npolicy: {result['policy'][0]} \t\t problem: {result['problem'][0]}\t\t seed: {result['problem'][0]}")
+        print(f"\npolicy: {result['policy'][0]} \t\t problem: {result['problem'][0]}\t\t seed: {result['seed'][0]}")
         for type in types:
             times = result.loc[result['type'] == type]['walltime']
             nnodes = result.loc[result['type'] == type]['nnodes']
             status = result.loc[result['type'] == type].groupby(result.status.str.strip("'"))['status'].count()
-            print(f'\t{type}: {round(times.mean(), 2)} +/- {round(times.std()/times.mean(), 2)*100}% s', end='  ')
-            print(f'\tnodes: {round(nnodes.mean(), 1)} +/- {round(nnodes.std()/times.mean(), 1)*100}%  #', end='  ')
+            print(f'\t{type}: {round(times.mean(), 2)} +/- {round(times.std(), 2)} s', end='  ')
+            print(f'\tnodes: {round(nnodes.mean(), 1)} +/- {round(nnodes.std(), 1)}  #', end='  ')
             try:
-                print(f'''\topt: {status['optimal']} /  {status['timelimit']}''')
+                print(f'''\topt: {status['optimal']} /  {status['timelimit']+status['optimal']}''')
             except Exception:
                 pass
             print()

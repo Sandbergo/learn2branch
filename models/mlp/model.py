@@ -65,7 +65,7 @@ class Policy(Model):
             self.activation,
             nn.Linear(self.ff_size, 1, bias=False),
         )
-        
+        """
         # seed 46
         self.output_module = nn.Sequential(
             nn.Linear(self.n_input_feats, self.ff_size*4, bias=True),
@@ -93,9 +93,9 @@ class Policy(Model):
         self.output_module = nn.Sequential(
             nn.Linear(self.n_input_feats, 1, bias=True),
         )
-
+        """
         
-        # seed ??
+        # seed 70
         self.output_module = nn.Sequential(
             nn.Linear(self.n_input_feats, self.ff_size*4, bias=True),
             self.activation,

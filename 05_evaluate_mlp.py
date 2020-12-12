@@ -115,7 +115,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     instances = []
-    seeds = [61]  # [0, 61, 70]  # [0, 1, 2]
+    seeds = [70]  # [0, 61, 70]  # [0, 1, 2]
     time_limit = 2700
 
     ### OUTPUT DIRECTORY
@@ -144,9 +144,9 @@ if __name__ == '__main__':
         instances += [{'type': 'big', 'path': f"data/instances/setcover/transfer_2000r_1000c_0.05d/instance_{i+1}.lp"} for i in range(20)]
 
     elif args.problem == 'cauctions':
-        instances += [{'type': 'small', 'path': f"data/instances/cauctions/transfer_100_500/instance_{i+1}.lp"} for i in range(20)]
-        instances += [{'type': 'medium', 'path': f"data/instances/cauctions/transfer_200_1000/instance_{i+1}.lp"} for i in range(20)]
-        instances += [{'type': 'big', 'path': f"data/instances/cauctions/transfer_300_1500/instance_{i+1}.lp"} for i in range(20)]
+        instances += [{'type': 'small', 'path': f"data/instances/cauctions/transfer_100_500/instance_{i+1}.lp"} for i in range(100)]
+        # instances += [{'type': 'medium', 'path': f"data/instances/cauctions/transfer_200_1000/instance_{i+1}.lp"} for i in range(20)]
+        # instances += [{'type': 'big', 'path': f"data/instances/cauctions/transfer_300_1500/instance_{i+1}.lp"} for i in range(20)]
 
     elif args.problem == 'facilities':
         instances += [{'type': 'small', 'path': f"data/instances/facilities/transfer_100_100_5/instance_{i+1}.lp"} for i in range(20)]

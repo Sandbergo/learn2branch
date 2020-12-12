@@ -10,8 +10,8 @@ import pickle
 
 import pyscipopt as scip
 
-# import tensorflow as tf
-# import tensorflow.contrib.eager as tfe
+import tensorflow as tf
+import tensorflow.contrib.eager as tfe
 
 # import svmrank
 
@@ -31,7 +31,7 @@ class PolicyBranching(scip.Branchrule):
             model.restore_state(policy['parameters'])
             self.policy = tfe.defun(model.call, input_signature=model.input_signature)
 
-        elif self.policy_type == 'internal':
+        if self.policy_type == 'internal':
             self.policy = policy['name']
 
         elif self.policy_type == 'ml-competitor':
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         '--time_limit',
         help='time limit to solve problems',
         type=int,
-        default=3600,
+        default=2700,
     )
     parser.add_argument(
         '--hybrid_data_structure',
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     instances = []
-    seeds = [0, 1, 2, 3, 4]
+    seeds = [0]  # [0, 1, 2, 3, 4]
     time_limit = args.time_limit
     device = "CPU" if args.gpu == -1 else "GPU"
 
@@ -208,7 +208,7 @@ if __name__ == '__main__':
         gcnn_models += ['mean_convolution', 'no_prenorm'] if not args.no_gnn else []
 
     elif args.problem == 'cauctions':
-        instances += [{'type': 'small', 'path': f"data/instances/cauctions/transfer_100_500/instance_{i+1}.lp"} for i in range(20)]
+        instances += [{'type': 'small', 'path': f"data/instances/cauctions/transfer_100_500/instance_{i+1}.lp"} for i in range(100)]
         instances += [{'type': 'medium', 'path': f"data/instances/cauctions/transfer_200_1000/instance_{i+1}.lp"} for i in range(20)]
         instances += [{'type': 'big', 'path': f"data/instances/cauctions/transfer_300_1500/instance_{i+1}.lp"} for i in range(20)]
 
@@ -266,12 +266,13 @@ if __name__ == '__main__':
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
     else:
         os.environ['CUDA_VISIBLE_DEVICES'] = f'{args.gpu}'
-    """config = tf.ConfigProto()
+    config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     tf.enable_eager_execution(config)
-    tf.executing_eagerly()"""
+    tf.executing_eagerly()
 
     # load and assign tensorflow models to policies (share models and update parameters)
+    
     loaded_models = {}
     for policy in branching_policies:
         if policy['type'] == 'gcnn':
@@ -300,7 +301,7 @@ if __name__ == '__main__':
             else:
                 with open(f"{policy['model']}/model.pkl", 'rb') as f:
                     policy['model'] = pickle.load(f)
-
+    
     print("running SCIP...")
 
     fieldnames = [
