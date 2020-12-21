@@ -10,7 +10,7 @@
 ---
 
 <p align="center">
-Learning the optimal branching variable in Mixed Integer Linear Programming Brach & Bound algorithms with efficient multilayer perceptrons. 
+Learning the optimal branching variable in Mixed Integer Linear Programming Brach & Bound algorithms with multi-layer perceptrons. 
 </p>
 <br> 
 
