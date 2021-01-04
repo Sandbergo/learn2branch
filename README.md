@@ -17,7 +17,7 @@ Learning the optimal branching variable in Mixed Integer Linear Programming Brac
 
 ## About <a name = "about"></a>
 
-This project is a continued exploration and development of ideas from two pieces of academic work:
+This project is a continued exploration and development of ideas from two articles:
 
 Maxime Gasse, Didier Chételat, Nicola Ferroni, Laurent Charlin, Andrea Lodi [Exact Combinatorial Optimization with Graph Convolutional Neural Networks](https://github.com/ds4dm/learn2branch) (2019).
 
