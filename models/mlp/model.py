@@ -89,10 +89,7 @@ class Policy(Model):
         )
 
 
-        # Seed 61
-        self.output_module = nn.Sequential(
-            nn.Linear(self.n_input_feats, 1, bias=True),
-        )
+        
         """
         
         # seed 70
@@ -110,6 +107,11 @@ class Policy(Model):
             nn.Linear(self.ff_size*4, self.ff_size*4, bias=True),
             self.activation,
             nn.Linear(self.ff_size*4, 1, bias=True),
+        )
+
+        # Seed 61
+        self.output_module = nn.Sequential(
+            nn.Linear(self.n_input_feats, 1, bias=True),
         )
         
         print(self.output_module)
