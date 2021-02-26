@@ -10,20 +10,20 @@
 ---
 
 <p align="center">
-Learning the optimal branching variable in Mixed Integer Linear Programming Brach & Bound algorithms with efficient multilayer perceptrons. 
+Learning the optimal branching variable in Mixed Integer Linear Programming Brach & Bound algorithms with multi-layer perceptrons. 
 </p>
 <br> 
 
 
 ## About <a name = "about"></a>
 
-This project is a continued exploration and development of ideas from two impressive pieces of academic work:
+This project is a continued exploration and development of ideas from two articles:
 
 Maxime Gasse, Didier Chételat, Nicola Ferroni, Laurent Charlin, Andrea Lodi [Exact Combinatorial Optimization with Graph Convolutional Neural Networks](https://github.com/ds4dm/learn2branch) (2019).
 
 Prateek Gupta, Maxime Gasse, Elias B. Khalil, M. Pawan Kumar, Andrea Lodi, Yoshua Bengio: [Hybrid Models for Learning to Branch](https://arxiv.org/abs/2006.15212) (2020)
 
-This is the code for my project thesis for a Master of Science in Engineering Cybernetics at the Norwegian University of Science and Technology. Feel free to contact me about any and all details of this project. 
+This is the code for my project thesis for a Master of Science in Engineering Cybernetics at the Norwegian University of Science and Technology. The title of the project is "Multi-Layer Perceptrons for Branching in Mixed-Integer Linear Programming". Feel free to contact me about any and all details of this project. 
 
 ## Installation
 
@@ -151,7 +151,7 @@ python learn2branch/05_evaluate.py $PROBLEM --internal_brancher fullstrong --tim
 Follow instructions [here](https://github.com/Sandbergo/learn2branch/blob/master/RESULTS.md) to reproduce the evaluation results (Table 4).
 
 ## Citation
-Please cite our paper if you use this code in your work.
+Please cite the original paper if you use this code in your work, and feel free to contact @Sandbergo for the specifics of my addition.
 ```
 @inproceedings{conf/nips/Gupta20hybrid,
   title={Hybrid Models for Learning to Branch},
@@ -162,4 +162,4 @@ Please cite our paper if you use this code in your work.
 ```
 
 ## Questions / Bugs
-Please feel free to submit a Github issue if you have any questions or find any bugs. We do not guarantee any support, but will do our best if we can help.
+Please feel free to submit a Github issue if you have any questions or find any bugs.
