@@ -1,4 +1,3 @@
-<h1 align="center">Learning to Branch</h1>
 
 <div align="center">
 
